@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="artplayer-plugin-anime4k">
+  <!-- A play button, upscaled. The back half is the frame as it arrives: two hard pixel columns,
+       each one step of the same staircase. The front half is the same edge after Anime4K: one
+       clean line. The steps are the smooth triangle's own outline quantised to a 6-unit grid,
+       so the two halves are one shape rather than two glued together.
+
+       Contained mark on the dark tile the other repos use (64 grid, rx 14, flat, no gradient).
+       Pink for the pixels because it is the one colour an anime player's icon may be loud in;
+       the smooth half stays white so the "after" is the part that reads first. -->
+  <rect width="64" height="64" rx="14" fill="#0B1220"/>
+  <path d="M18 12 H24 V16 H30 V48 H24 V52 H18 Z" fill="#FF4D8D"/>
+  <path d="M30 20 L47 32 L30 44 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"/>
+</svg>

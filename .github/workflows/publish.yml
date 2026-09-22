@@ -1,0 +1,64 @@
+# Publishes to npm with Trusted Publishing (OIDC): no npm token is stored in this repository, and
+# none should be added. npm checks the short-lived GitHub OIDC token against the trusted publisher
+# configured on npmjs.com for this package, and attaches provenance automatically.
+#
+# The trusted publisher entry on npmjs.com names THIS FILE (publish.yml). Renaming it breaks
+# publishing until the entry is updated there.
+
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # Check out the tag, not main, so the published artifact is exactly what was released and a
+      # later push to main cannot change it.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Verify tag matches the package version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${TAG#v}"
+          CURRENT=$(node -p "require('./package.json').version")
+          if [ "$CURRENT" != "$VERSION" ]; then
+            echo "::error::Tag $TAG expects version $VERSION but package.json is $CURRENT."
+            echo "Bump the version in a pull request before publishing the release."
+            exit 1
+          fi
+          if npm view "artplayer-plugin-anime4k@$VERSION" version >/dev/null 2>&1; then
+            echo "::error::$VERSION is already on npm. Versions there can never be reused."
+            exit 1
+          fi
+          echo "Version $VERSION matches the tag and is not on npm yet."
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run test
+
+      - run: bun run build
+
+      # Trusted publishing via OIDC - no npm token is stored in this repo. Node 24 ships npm 11,
+      # which trusted publishing needs (11.5.1+). The empty NODE_AUTH_TOKEN stops setup-node's
+      # placeholder from being sent instead of the OIDC exchange.
+      - run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ''

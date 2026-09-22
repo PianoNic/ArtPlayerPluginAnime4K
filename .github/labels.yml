@@ -1,0 +1,36 @@
+# The canonical label set, copied from Toamaisutaa (which matches HOPPER and KRINT). Release Drafter
+# reads these labels off merged pull requests to name the next version and sort the notes.
+#
+# Nothing syncs this automatically; `gh label create` / `gh label edit` apply it.
+
+- name: breaking
+  color: B60205
+  description: A change that alters the public API and requires consumers to update
+
+- name: feature
+  color: 0052CC
+  description: Introduction of a new capability or function to the project
+
+- name: enhancement
+  color: a2eeef
+  description: Requests or changes aimed at improving existing functionality or user experience
+
+- name: bug
+  color: d73a4a
+  description: A defect or issue in the code causing unintended behavior or errors
+
+- name: refactor
+  color: D93F0B
+  description: Changes that improve code structure, readability, or performance without altering functionality
+
+- name: documentation
+  color: 318BCB
+  description: Problems or improvements related to project documentation
+
+- name: CI/CD
+  color: 8834EF
+  description: Continuous Integration/Continuous Deployment-related issues or tasks
+
+- name: duplicate
+  color: cfd3d7
+  description: This issue or pull request already exists

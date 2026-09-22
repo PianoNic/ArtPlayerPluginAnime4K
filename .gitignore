@@ -1,0 +1,23 @@
+# Compiled output
+/dist
+/tmp
+/coverage
+
+# Node
+/node_modules
+npm-debug.log
+yarn-error.log
+
+# IDEs and editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.sublime-workspace
+
+# System files
+.DS_Store
+Thumbs.db
+
+# AI tooling
+.claude/
+.playwright-mcp/

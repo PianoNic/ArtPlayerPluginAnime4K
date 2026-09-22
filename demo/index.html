@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>artplayer-plugin-anime4k demo</title>
+    <link rel="icon" href="../assets/icon.svg" type="image/svg+xml" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0d1117;
+        --panel: #161b22;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --accent: #ff4d8d;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          15px/1.5 system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px 16px 48px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      header img {
+        width: 40px;
+        height: 40px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0;
+      }
+      form {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+      input,
+      select,
+      button {
+        font: inherit;
+        color: var(--text);
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 12px;
+      }
+      input {
+        flex: 1 1 320px;
+        min-width: 0;
+      }
+      button {
+        cursor: pointer;
+      }
+      #player {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #000;
+      }
+      dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 4px 16px;
+        margin: 16px 0 0;
+        padding: 12px 16px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      dt {
+        color: var(--muted);
+      }
+      dd {
+        margin: 0;
+        font-family: ui-monospace, monospace;
+        overflow-wrap: anywhere;
+      }
+      p.note {
+        color: var(--muted);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="../assets/icon.svg" alt="" />
+        <h1>artplayer-plugin-anime4k</h1>
+      </header>
+      <form id="source">
+        <input id="url" type="url" required aria-label="Video URL (mp4 or m3u8)" />
+        <select id="mode" aria-label="Mode">
+          <option value="auto">auto</option>
+          <option value="off">off</option>
+          <option value="performance">performance</option>
+          <option value="balanced">balanced</option>
+          <option value="quality">quality</option>
+        </select>
+        <button type="submit">Load</button>
+        <button type="button" id="clear-cache">Clear benchmark cache</button>
+      </form>
+      <div id="player"></div>
+      <dl>
+        <dt>WebGPU</dt>
+        <dd id="supported">checking...</dd>
+        <dt>Selected</dt>
+        <dd id="selected">-</dd>
+        <dt>Active</dt>
+        <dd id="active">-</dd>
+        <dt>Video</dt>
+        <dd id="resolution">-</dd>
+        <dt>Last event</dt>
+        <dd id="event">-</dd>
+      </dl>
+      <p class="note">
+        The video must be same-origin or served with CORS headers; WebGPU cannot read frames from a
+        cross-origin video. Open the settings gear in the player to switch modes there too.
+      </p>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run format:check
+
+      - run: bun run typecheck
+
+      - run: bun run test
+
+      - run: bun run build
+
+      # Packing on every build is what catches a broken "files" list or a missing entry point
+      # before a release does.
+      - name: Pack
+        run: npm pack --dry-run

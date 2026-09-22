@@ -1,0 +1,28 @@
+name: Release Drafter
+
+# Keeps a draft release up to date on every push to main. Publishing that draft by hand is what
+# triggers publish.yml.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  update_release_draft:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write # create and update the draft release
+      pull-requests: read # read the merged pull requests and their labels
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: release-drafter/release-drafter@v6
+        with:
+          config-name: release-drafter.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
