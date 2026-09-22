@@ -9,7 +9,7 @@ export type Preset = Exclude<ActiveMode, 'off'>;
 
 export const MODES: readonly Mode[] = ['auto', 'off', 'performance', 'balanced', 'quality'];
 
-/** Weakest to strongest. The order the downgrade walks backwards through. */
+/** Weakest to strongest. */
 export const PRESETS: readonly Preset[] = ['performance', 'balanced', 'quality'];
 
 export function isMode(value: unknown): value is Mode {
@@ -34,13 +34,7 @@ export interface BenchmarkSample {
   ms: number;
 }
 
-/**
- * The auto-mode decision: the strongest preset whose frame time stays within the budget.
- *
- * Nothing fitting the budget - or nothing measured at all - means `off`. The budget is a ceiling
- * on GPU time per frame, not a target: at 8 ms a 24 fps episode leaves the GPU idle four fifths of
- * the time, which is the headroom the page, the subtitles and the compositor need.
- */
+/** The strongest preset whose median frame time fits the budget; `off` when none does. */
 export function pickAutoMode(samples: readonly BenchmarkSample[], budgetMs: number): ActiveMode {
   let best: ActiveMode = 'off';
   for (const preset of PRESETS) {

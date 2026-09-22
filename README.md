@@ -96,13 +96,13 @@ most anime, which is mastered at 720p-1080p and blurred on the way to you.
 | Mode          | Pipeline                                                                     | Use                               |
 | ------------- | ---------------------------------------------------------------------------- | --------------------------------- |
 | `off`         | -                                                                            | The plain `<video>`               |
-| `performance` | `Upscale_CNN_x2_M`                                                           | Integrated GPUs, laptops          |
+| `performance` | `Deblur_DoG` > `Upscale_CNN_x2_M` > auto-downscale                           | Integrated GPUs, laptops          |
 | `balanced`    | `Clamp_Highlights` > `Restore_CNN_M` > `Upscale_CNN_x2_M` > auto-downscale   | Mode A (Fast)                     |
 | `quality`     | `Clamp_Highlights` > `Restore_CNN_VL` > `Upscale_CNN_x2_VL` > auto-downscale | Mode A (HQ), discrete GPUs        |
 | `auto`        | The strongest of the three that fits the frame budget                        | The default; what most users want |
 
 Each x2 step only runs when the screen is more than 1.2x the video on both axes, so a 1080p episode
-in a 1080p window gets restoration but no upscale - and `performance` there does nothing at all.
+in a 1080p window gets the restore / deblur step but no upscale.
 Auto-downscale brings an overshoot (x2 of 720p is 1440p, too big for a 1080p screen) back down
 with a proper filter instead of the final bilinear sample.
 
@@ -133,6 +133,7 @@ watching again. The cap is lifted when the user picks a mode or the source chang
 | `onError`         | `(error: unknown) => void`                 | -                            | Upscaling had to stop: cross-origin video, lost GPU device, build failure        |
 | `setting`         | `boolean`                                  | `true`                       | Add the entry to ArtPlayer's settings menu (needs `setting: true` on the player) |
 | `icon`            | `string`                                   | sparkles glyph               | SVG/HTML for the settings entry                                                  |
+| `compare`         | `boolean`                                  | `false`                      | Start in split view: original on the left, upscaled on the right                 |
 | `frameBudgetMs`   | `number`                                   | `8`                          | Auto's ceiling on median GPU time per frame                                      |
 | `slowFrameMs`     | `number`                                   | `16`                         | Frames slower than this count against the current preset                         |
 | `autoDowngrade`   | `boolean`                                  | `true`                       | Step down when the GPU cannot keep up                                            |
@@ -145,14 +146,17 @@ watching again. The cap is lifted when the user picks a mode or the source chang
 
 `art.plugins.artplayerPluginAnime4k`:
 
-| Member            | Description                                                                      |
-| ----------------- | -------------------------------------------------------------------------------- |
-| `setMode(mode)`   | Select a mode; unknown values are ignored                                        |
-| `getMode()`       | The selected mode, `'auto'` included                                             |
-| `getActiveMode()` | What is rendering now: auto's pick, a downgraded preset, or `'off'`              |
-| `supported`       | WebGPU is usable (`false` until the check finishes)                              |
-| `ready`           | `Promise<boolean>` resolving with `supported`; never rejects                     |
-| `destroy()`       | Remove the canvas and settings entry, free the GPU; also runs on `art.destroy()` |
+| Member                      | Description                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------- |
+| `setMode(mode)`             | Select a mode; unknown values are ignored                                        |
+| `getMode()`                 | The selected mode, `'auto'` included                                             |
+| `getActiveMode()`           | What is rendering now: auto's pick, a downgraded preset, or `'off'`              |
+| `setCompare(on, position?)` | Split view on/off; `position` (0..1, default 0.5) is where the line sits         |
+| `getCompare()`              | Whether the split view is on                                                     |
+| `getStats()`                | `{ active, frameMs, native, target, upscaling }` for a status readout            |
+| `supported`                 | WebGPU is usable (`false` until the check finishes)                              |
+| `ready`                     | `Promise<boolean>` resolving with `supported`; never rejects                     |
+| `destroy()`                 | Remove the canvas and settings entry, free the GPU; also runs on `art.destroy()` |
 
 The plugin only reads `mode` at start-up. To remember a viewer's choice, store what `onModeChange`
 reports and pass it back as `mode` next time.
@@ -210,7 +214,8 @@ bun run build      # dist/index.js (ESM) + .d.ts, dist/artplayer-plugin-anime4k.
 ```
 
 The demo takes any mp4 or m3u8 URL (`?url=...&mode=quality` works too) and shows the selected and
-active mode live.
+active mode live. `/demo/compare.html` is a side-by-side view: open an episode from your disk (or
+drop it on the player), drag the split line, and switch modes to see what each one changes.
 
 ## Credits
 

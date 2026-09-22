@@ -21,3 +21,5 @@ Thumbs.db
 # AI tooling
 .claude/
 .playwright-mcp/
+# local test media
+*.local.*

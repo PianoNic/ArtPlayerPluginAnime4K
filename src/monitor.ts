@@ -17,14 +17,8 @@ export const DEFAULT_MONITOR_CONFIG: MonitorConfig = {
 };
 
 /**
- * Watches frames and says when the current preset cannot keep up.
- *
- * A frame is bad when it took longer than `slowFrameMs` on the GPU, when it had to be skipped
- * because the previous one was still in flight, or when the browser reported it dropped. One
- * slow frame is noise - a seek, a tab switch, a GC pause - so the monitor only answers yes once
- * a whole window is in and more than `maxBadRatio` of it was bad.
- *
- * Pure bookkeeping: no clocks, no DOM, no GPU. The plugin feeds it and acts on the answer.
+ * Decides when the current preset cannot keep up: once a full window is in and more than
+ * `maxBadRatio` of it was bad (slow on the GPU, skipped while busy, or dropped by the browser).
  */
 export class FrameMonitor {
   private readonly config: MonitorConfig;
@@ -63,7 +57,7 @@ export class FrameMonitor {
     );
   }
 
-  /** Start over, warmup included. Called after every rebuild and every downgrade. */
+  /** Start over, warmup included. */
   reset(): void {
     this.window = [];
     this.warmupLeft = this.config.warmupFrames;

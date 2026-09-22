@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ArtPlayerPluginAnime4K compare</title>
+    <link rel="icon" href="../assets/icon.svg" type="image/svg+xml" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0d1117;
+        --panel: #161b22;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --accent: #ff4d8d;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          15px/1.5 system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px 16px 48px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      header img {
+        width: 36px;
+        height: 36px;
+      }
+      h1 {
+        font-size: 19px;
+        margin: 0;
+      }
+      header a {
+        margin-left: auto;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .bar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      input[type='url'],
+      button,
+      label.file {
+        font: inherit;
+        color: var(--text);
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 7px 12px;
+      }
+      input[type='url'] {
+        flex: 1 1 320px;
+        min-width: 0;
+      }
+      button,
+      label.file {
+        cursor: pointer;
+      }
+      label.file input {
+        display: none;
+      }
+      .modes button[aria-pressed='true'] {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .split {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1 1 260px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .split input {
+        flex: 1;
+        accent-color: var(--accent);
+      }
+      #stage {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #000;
+      }
+      #stage.drop::after {
+        content: 'Drop the video here';
+        position: absolute;
+        inset: 0;
+        z-index: 200;
+        display: grid;
+        place-items: center;
+        font-size: 20px;
+        background: rgba(255, 77, 141, 0.25);
+        border: 2px dashed var(--accent);
+        border-radius: 12px;
+      }
+      #player {
+        width: 100%;
+        height: 100%;
+      }
+      .tag {
+        position: absolute;
+        top: 12px;
+        z-index: 100;
+        padding: 3px 10px;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.65);
+        font-size: 13px;
+        pointer-events: none;
+      }
+      #tag-left {
+        left: 12px;
+      }
+      #tag-right {
+        right: 12px;
+        color: var(--accent);
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .stats div {
+        padding: 10px 12px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      .stats span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .stats strong {
+        font-family: ui-monospace, monospace;
+        font-weight: 600;
+      }
+      .note {
+        color: var(--muted);
+        font-size: 13px;
+        margin: 12px 0 0;
+      }
+      kbd {
+        padding: 1px 6px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="../assets/icon.svg" alt="" />
+        <h1>Anime4K compare</h1>
+        <a href="./">plugin demo</a>
+      </header>
+
+      <form class="bar" id="source">
+        <label class="file">Open video file <input id="file" type="file" accept="video/*" /></label>
+        <input
+          id="url"
+          type="url"
+          placeholder="…or a video URL (mp4 / m3u8, same origin or CORS)"
+        />
+        <button type="submit">Load URL</button>
+      </form>
+
+      <div class="bar">
+        <div class="modes" id="modes">
+          <button type="button" data-mode="off">Off</button>
+          <button type="button" data-mode="performance">Performance</button>
+          <button type="button" data-mode="balanced">Balanced</button>
+          <button type="button" data-mode="quality">Quality</button>
+          <button type="button" data-mode="auto">Auto</button>
+        </div>
+        <div class="split">
+          <span>Original</span>
+          <input id="split" type="range" min="0" max="100" value="50" aria-label="Split position" />
+          <span>Upscaled</span>
+        </div>
+        <button type="button" id="flip" title="Toggle the split (key: S)">Split on</button>
+      </div>
+
+      <div id="stage">
+        <div id="player"></div>
+        <span class="tag" id="tag-left">Original</span>
+        <span class="tag" id="tag-right">Anime4K</span>
+      </div>
+
+      <div class="stats">
+        <div><span>WebGPU</span><strong id="s-gpu">checking…</strong></div>
+        <div><span>Rendering</span><strong id="s-active">-</strong></div>
+        <div><span>GPU time per frame</span><strong id="s-ms">-</strong></div>
+        <div><span>Video</span><strong id="s-native">-</strong></div>
+        <div><span>Render target</span><strong id="s-target">-</strong></div>
+        <div><span>x2 upscale</span><strong id="s-up">-</strong></div>
+      </div>
+
+      <p class="note">
+        Open an anime episode from your disk (or drop it on the player). Pause on a frame with clear
+        line art and drag the slider: left of the line is the plain video, right of it the Anime4K
+        output. The x2 upscale only runs when the player is more than 1.2x the video's resolution;
+        otherwise you see the restore/sharpen step alone. Fullscreen a 720p or 1080p episode for the
+        strongest effect. Keys: <kbd>S</kbd> split on/off, <kbd>1</kbd>–<kbd>5</kbd> modes.
+      </p>
+    </main>
+    <script type="module" src="./compare.ts"></script>
+  </body>
+</html>

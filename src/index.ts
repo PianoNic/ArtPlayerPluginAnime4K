@@ -32,12 +32,32 @@ export interface Anime4kPlugin {
   getMode(): Mode;
   /** What is rendering right now: auto's pick, a downgraded preset, or `off`. */
   getActiveMode(): ActiveMode;
+  /**
+   * Split view: the original video left of `position` (0..1 of the width), the upscaled one right
+   * of it. `setCompare(false)` shows the upscaled frame in full again.
+   */
+  setCompare(on: boolean, position?: number): void;
+  getCompare(): boolean;
+  /** What is rendering and how fast, for a status readout. */
+  getStats(): Anime4kStats;
   /** WebGPU is usable in this browser. `false` until the capability check has finished. */
   readonly supported: boolean;
   /** Resolves with `supported` once the capability check has finished. Never rejects. */
   readonly ready: Promise<boolean>;
   /** Stop rendering and remove the canvas and the settings entry. Called on `art.destroy()` too. */
   destroy(): void;
+}
+
+export interface Anime4kStats {
+  active: ActiveMode;
+  /** Average GPU time per frame over the last frames, in ms; null before the first frame. */
+  frameMs: number | null;
+  /** The video's own resolution. */
+  native: Size | null;
+  /** The resolution the pipeline renders to (on-screen size times the device pixel ratio). */
+  target: Size | null;
+  /** Whether an x2 upscale step runs (target more than 1.2x the video on both axes). */
+  upscaling: boolean;
 }
 
 type VideoFrameCallbackVideo = HTMLVideoElement & {
@@ -60,14 +80,17 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
     let destroyed = false;
     let gpu: GpuContext | null = null;
     let renderer: Renderer | null = null;
-    // Downgrades cap the selected preset until the source or the selection changes.
+    // Set by a downgrade; cleared when the source or the selection changes.
     let ceiling: ActiveMode | null = null;
-    // A cross-origin source cannot be read by WebGPU; remember it so it is not retried per frame.
+    // A cross-origin source WebGPU may not read; not retried.
     let blockedSource: string | null = null;
-    // Every async step checks this and stops if something newer started meanwhile.
+    // Bumped by every rebuild; async work from an older generation stops.
     let generation = 0;
     let built: { native: Size; target: Size } | null = null;
     let settingAdded = false;
+    let compare = opts.compare;
+    let comparePosition = 0.5;
+    let frameMs: number | null = null;
 
     const canvas = document.createElement('canvas');
     canvas.className = 'art-anime4k';
@@ -78,6 +101,37 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       display: 'none',
     });
     video.insertAdjacentElement('afterend', canvas);
+
+    // The split line of the compare view.
+    const divider = document.createElement('div');
+    divider.className = 'art-anime4k-divider';
+    Object.assign(divider.style, {
+      position: 'absolute',
+      zIndex: '10',
+      width: '2px',
+      marginLeft: '-1px',
+      background: 'rgba(255, 255, 255, 0.85)',
+      pointerEvents: 'none',
+      display: 'none',
+    });
+    canvas.insertAdjacentElement('afterend', divider);
+
+    function applyCompare(): void {
+      const pct = `${(comparePosition * 100).toFixed(2)}%`;
+      canvas.style.clipPath = compare ? `inset(0 0 0 ${pct})` : '';
+      const shown = compare && canvas.style.display !== 'none';
+      divider.style.display = shown ? 'block' : 'none';
+      if (shown) {
+        const left = parseFloat(canvas.style.left) || 0;
+        const width = parseFloat(canvas.style.width) || 0;
+        Object.assign(divider.style, {
+          left: `${left + width * comparePosition}px`,
+          top: canvas.style.top,
+          height: canvas.style.height,
+        });
+      }
+    }
+    applyCompare();
 
     const monitor = new FrameMonitor({ slowFrameMs: opts.slowFrameMs });
 
@@ -108,6 +162,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
         height: `${layout.rect.height}px`,
         transform: cs.transform === 'none' ? '' : cs.transform,
       });
+      applyCompare();
       return layout;
     }
 
@@ -156,6 +211,8 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
 
     function hideCanvas(): void {
       canvas.style.display = 'none';
+      frameMs = null;
+      applyCompare();
     }
 
     // ---- decision -----------------------------------------------------------------------------
@@ -174,7 +231,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
         if (gen !== generation || destroyed) return null;
         samples.push({ preset, ms });
         log('benchmark', preset, `${ms.toFixed(2)} ms`);
-        // Presets are ordered by cost: once one misses the budget, the stronger ones will too.
+        // Stronger presets are slower still.
         if (!(ms <= opts.frameBudgetMs)) break;
       }
       return pickAutoMode(samples, opts.frameBudgetMs);
@@ -200,7 +257,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
         return;
       }
       const layout = measure();
-      // No metadata or no size yet; `loadedmetadata` / the resize observer will call back.
+      // Not laid out yet; `loadedmetadata` or the resize observer calls back.
       if (!layout) return;
       const native = { width: video.videoWidth, height: video.videoHeight };
       const target = layout.target;
@@ -214,7 +271,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
             next = cached;
             log('auto (cached)', cached);
           } else {
-            // The benchmark needs a decoded frame; `loadeddata` calls back.
+            // Needs a decoded frame; `loadeddata` calls back.
             if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
             const picked = await benchmark(native, target, gen);
             if (picked === null) return;
@@ -245,6 +302,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       }
       built = { native, target };
       monitor.reset();
+      frameMs = null;
       firstFrame = true;
       setActive(next);
       startLoop();
@@ -292,7 +350,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       lastTime = -1;
       lastDropped = droppedFrames();
       schedule();
-      // A paused video presents no new frames, so draw the one on screen right away.
+      // A paused video presents no new frames: draw the current one now.
       if (video.paused) onFrame();
     }
 
@@ -309,10 +367,9 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       if (destroyed || active === 'off' || !renderer?.ready) return;
       schedule();
 
-      // Hidden tab or a paused video with nothing new to show: no work.
       if (document.visibilityState === 'hidden') return;
       if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
-      // A quality switch changes the frame size before `resize` fires; wait for the rebuild.
+      // A quality switch changes the frame size before `resize` fires.
       if (nativeChanged()) {
         onLayoutChange();
         return;
@@ -341,7 +398,9 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
           if (firstFrame) {
             firstFrame = false;
             canvas.style.display = 'block';
+            applyCompare();
           }
+          frameMs = frameMs === null ? ms : frameMs * 0.9 + ms * 0.1;
           if (!video.paused) monitor.recordFrame(ms);
           if (opts.autoDowngrade && monitor.shouldDowngrade()) downgrade();
         })
@@ -370,7 +429,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
     }
 
     function onSourceStart(): void {
-      // A new episode or quality: hide the last frame of the old one and forget its downgrade.
+      // New source: hide the old frame and forget its downgrade.
       hideCanvas();
       ceiling = null;
       firstFrame = true;
@@ -493,6 +552,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       gpu?.device.destroy();
       gpu = null;
       canvas.remove();
+      divider.remove();
     }
 
     art.on('destroy', destroy);
@@ -525,6 +585,28 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       setMode,
       getMode: () => selected,
       getActiveMode: () => active,
+      setCompare(on: boolean, position?: number) {
+        compare = on === true;
+        if (typeof position === 'number' && Number.isFinite(position))
+          comparePosition = Math.min(1, Math.max(0, position));
+        applyCompare();
+      },
+      getCompare: () => compare,
+      getStats(): Anime4kStats {
+        const native = built?.native ?? null;
+        const target = built?.target ?? null;
+        return {
+          active,
+          frameMs: active === 'off' ? null : frameMs,
+          native,
+          target,
+          upscaling:
+            !!native &&
+            !!target &&
+            target.width > native.width * 1.2 &&
+            target.height > native.height * 1.2,
+        };
+      },
       get supported() {
         return supported;
       },

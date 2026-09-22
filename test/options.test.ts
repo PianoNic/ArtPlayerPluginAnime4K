@@ -8,6 +8,7 @@ describe('resolveOptions', () => {
     expect(o.labels).toEqual(DEFAULT_LABELS);
     expect(o.setting).toBe(true);
     expect(o.icon).toBe(DEFAULT_ICON);
+    expect(o.compare).toBe(false);
     expect(o.frameBudgetMs).toBe(8);
     expect(o.slowFrameMs).toBe(16);
     expect(o.autoDowngrade).toBe(true);
@@ -65,6 +66,15 @@ describe('resolveOptions', () => {
     expect(o.labels.quality).toBe('Qualität');
     expect(o.labels.off).toBe('Off');
     expect(o.labels.auto).toBe('Auto');
+  });
+
+  it('turns the split view on only for an explicit true', () => {
+    expect(resolveOptions({ compare: true }).compare).toBe(true);
+    expect(resolveOptions({ compare: 'yes' as never }).compare).toBe(false);
+  });
+
+  it('keeps the default icon unfilled inside ArtPlayer', () => {
+    expect(DEFAULT_ICON).toContain('style="fill:none"');
   });
 
   it('does not share the defaults object between players', () => {

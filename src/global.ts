@@ -1,5 +1,4 @@
-// Entry for the <script> build: the IIFE assigns this default export to
-// `window.artplayerPluginAnime4k`, the same shape as the official ArtPlayer plugins.
+// Entry of the <script> build, exposed as `window.artplayerPluginAnime4k`.
 import artplayerPluginAnime4k from './index.js';
 
 export default artplayerPluginAnime4k;

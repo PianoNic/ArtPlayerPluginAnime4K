@@ -15,13 +15,7 @@ export interface Layout {
   target: Size;
 }
 
-/**
- * Where the picture actually lands inside the video element's content box.
- *
- * `contain` (the browser default, and ArtPlayer's) letterboxes; `fill` stretches, which is what
- * ArtPlayer's aspect-ratio setting uses; `cover` crops. The canvas has to cover exactly the same
- * pixels as the picture underneath, or the upscaled frame drifts from the subtitles.
- */
+/** Where the picture lands inside the video's content box for the given `object-fit`. */
 export function fitRect(box: Rect, video: Size, objectFit: string): Rect {
   if (video.width <= 0 || video.height <= 0 || box.width <= 0 || box.height <= 0) return box;
   if (objectFit === 'fill') return box;
@@ -40,13 +34,7 @@ export function fitRect(box: Rect, video: Size, objectFit: string): Rect {
   };
 }
 
-/**
- * The canvas rectangle and the device-pixel target the pipeline should upscale to.
- *
- * The target is the on-screen size times the device pixel ratio, shrunk proportionally when it
- * would exceed `maxPixels` - a 5K display in fullscreen would otherwise ask for a 14-megapixel
- * texture chain for no visible gain.
- */
+/** The canvas rectangle and the device-pixel upscale target, capped at `maxPixels`. */
 export function computeLayout(
   box: Rect,
   video: Size,

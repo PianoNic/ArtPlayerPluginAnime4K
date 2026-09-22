@@ -1,9 +1,9 @@
 import { isPreset, type ActiveMode, type Preset } from './modes.js';
 
-/** Benchmarks go stale when drivers and browsers update; re-measure after this long. */
+/** Re-benchmark after this long (drivers and browsers change). */
 export const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** Bumped whenever the preset definitions change, so old measurements stop applying. */
+/** Bump when the presets change. */
 const CACHE_VERSION = 1;
 
 interface CacheEntry {
@@ -15,18 +15,14 @@ interface CacheEntry {
 /** Just enough of `Storage` to test without a browser. */
 export type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
 
-/**
- * One entry per GPU and per resolution pair. The same card picks a different preset for a 480p
- * source on a 4K screen than for a 1080p source in a small window, and a laptop's integrated GPU
- * must not reuse what its discrete GPU measured.
- */
+/** One entry per GPU, video resolution and (bucketed) target size. */
 export function benchmarkCacheKey(
   prefix: string,
   gpu: string,
   native: { width: number; height: number },
   target: { width: number; height: number },
 ): string {
-  // Rounded to 90px steps so a window resized by a few pixels still hits the cache.
+  // 90px buckets, so a slightly resized window still hits the cache.
   const bucket = (n: number) => Math.round(n / 90) * 90;
   return `${prefix}:bench:v${CACHE_VERSION}:${gpu}:${native.width}x${native.height}:${bucket(target.width)}x${bucket(target.height)}`;
 }
@@ -63,7 +59,7 @@ export function writeCachedMode(
     const entry: CacheEntry = { v: CACHE_VERSION, mode, at: now };
     storage.setItem(key, JSON.stringify(entry));
   } catch {
-    // Storage is a convenience; losing it only costs a re-benchmark.
+    // Only costs a re-benchmark.
   }
 }
 

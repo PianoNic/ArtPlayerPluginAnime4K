@@ -4,10 +4,7 @@ import type { Size } from './layout.js';
 
 type PipelinesModule = typeof import('./pipelines.js');
 
-/**
- * The Anime4K networks are several hundred KB of WGSL. Loading them lazily keeps them out of the
- * host's main bundle, and a browser without WebGPU never downloads them at all.
- */
+/** The networks are several hundred KB of WGSL: loaded on first use, never without WebGPU. */
 let pipelinesModule: Promise<PipelinesModule> | null = null;
 function loadPipelines(): Promise<PipelinesModule> {
   pipelinesModule ??= import('./pipelines.js');
@@ -21,10 +18,7 @@ export interface GpuContext {
   name: string;
 }
 
-/**
- * Asks for a WebGPU device. Resolves to null - never throws - when the browser has no WebGPU,
- * the adapter is blocklisted, or the request fails for any other reason.
- */
+/** A WebGPU device, or null when WebGPU is missing, blocklisted or fails. Never throws. */
 export async function acquireGpu(): Promise<GpuContext | null> {
   try {
     const gpu = typeof navigator !== 'undefined' ? navigator.gpu : undefined;
@@ -44,10 +38,8 @@ export async function acquireGpu(): Promise<GpuContext | null> {
 }
 
 /**
- * The Anime4K pipelines allocate their own textures and expose no way to free them. Handing them
- * a device whose `createTexture` / `createBuffer` are recorded lets a rebuild destroy everything
- * the previous chain allocated, instead of waiting for the garbage collector to notice several
- * hundred MB of intermediate textures.
+ * Records every texture and buffer a pipeline creates, so a rebuild can free them right away. The
+ * Anime4K pipelines offer no way to release their intermediate textures themselves.
  */
 class ResourceScope {
   readonly device: GPUDevice;
@@ -144,10 +136,7 @@ async function buildChain(
   }
 }
 
-/**
- * Copies the current video frame in and records the chain. Throws a `SecurityError` for a
- * cross-origin video without CORS - WebGPU refuses to read tainted pixels.
- */
+/** Copies the current frame in and records the chain. Throws `SecurityError` for a tainted video. */
 async function encodeChain(
   gpu: GpuContext,
   chain: Chain,
@@ -251,11 +240,7 @@ export class Renderer {
   }
 }
 
-/**
- * Times a preset on the current video frame: a few warm-up frames (the first ones pay for shader
- * compilation), then the median of the rest. Nothing is drawn - only the chain runs, which is
- * where all of the cost is.
- */
+/** GPU time of a preset on the current frame, per frame, after a few warm-up frames. Draws nothing. */
 export async function measurePreset(
   gpu: GpuContext,
   video: HTMLVideoElement,
