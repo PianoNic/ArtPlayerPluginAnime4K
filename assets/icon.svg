@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="artplayer-plugin-anime4k">
-  <!-- A play button, upscaled. The back half is the frame as it arrives: two hard pixel columns,
-       each one step of the same staircase. The front half is the same edge after Anime4K: one
-       clean line. The steps are the smooth triangle's own outline quantised to a 6-unit grid,
-       so the two halves are one shape rather than two glued together.
+  <!-- An anime eye: the heavy upper lash, thickening toward the outer corner, the tall iris, and the two
+       catchlights. Nothing says "anime" faster, and the catchlights - the sharpest, brightest
+       pixels in any anime frame - are exactly what upscaling is supposed to keep crisp.
 
        Contained mark on the dark tile the other repos use (64 grid, rx 14, flat, no gradient).
-       Pink for the pixels because it is the one colour an anime player's icon may be loud in;
-       the smooth half stays white so the "after" is the part that reads first. -->
+       Pink iris, white lash and highlights: two colours on the tile, readable at 16px. -->
   <rect width="64" height="64" rx="14" fill="#0B1220"/>
-  <path d="M18 12 H24 V16 H30 V48 H24 V52 H18 Z" fill="#FF4D8D"/>
-  <path d="M30 20 L47 32 L30 44 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"/>
+  <ellipse cx="32" cy="35" rx="12" ry="16" fill="#FF4D8D"/>
+  <circle cx="27" cy="30" r="5" fill="#FFFFFF"/>
+  <circle cx="37.5" cy="43" r="2.5" fill="#FFFFFF"/>
+  <path d="M9 30 C17 17 38 9 57 14 L50 22 C37 17 22 20 13 32 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"/>
 </svg>
