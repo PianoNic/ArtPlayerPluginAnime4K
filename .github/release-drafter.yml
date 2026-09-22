@@ -56,7 +56,7 @@ version-resolver:
 
 # ONLY ON THE VERY FIRST RELEASE: there is no previous tag, so the compare link renders as
 # `compare/...v0.1.0`. Replace it in the draft with
-# https://github.com/PianoNic/artplayer-plugin-anime4k/commits/v0.1.0 before publishing.
+# https://github.com/PianoNic/ArtPlayerPluginAnime4K/commits/v0.1.0 before publishing.
 template: |
   ## What's Changed
 

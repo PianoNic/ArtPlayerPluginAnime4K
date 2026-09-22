@@ -1,18 +1,18 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/PianoNic/artplayer-plugin-anime4k/main/assets/icon.svg" width="120" alt="artplayer-plugin-anime4k logo">
+  <img src="assets/icon.svg" width="180" alt="ArtPlayerPluginAnime4K Logo" />
 </p>
 
-<h1 align="center">artplayer-plugin-anime4k</h1>
+<h1 align="center">ArtPlayerPluginAnime4K</h1>
 
 <p align="center">
   <strong>Real-time Anime4K upscaling for ArtPlayer, on WebGPU.</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/PianoNic/artplayer-plugin-anime4k"><img src="https://badgetrack.pianonic.ch/badge?tag=artplayer-plugin-anime4k&label=visits&color=0d1117&style=flat" alt="visits" /></a>
+  <a href="https://github.com/PianoNic/ArtPlayerPluginAnime4K"><img src="https://badgetrack.pianonic.ch/badge?tag=artplayerpluginanime4k&label=visits&color=0d1117&style=flat" alt="visits" /></a>
   <a href="https://www.npmjs.com/package/artplayer-plugin-anime4k"><img src="https://img.shields.io/npm/v/artplayer-plugin-anime4k?color=0d1117&label=npm" alt="npm version" /></a>
   <a href="https://www.npmjs.com/package/artplayer-plugin-anime4k"><img src="https://img.shields.io/npm/dm/artplayer-plugin-anime4k?color=0d1117&label=downloads" alt="npm downloads" /></a>
-  <a href="https://github.com/PianoNic/artplayer-plugin-anime4k/blob/main/LICENSE"><img src="https://img.shields.io/github/license/PianoNic/artplayer-plugin-anime4k?color=0d1117" alt="MIT" /></a>
+  <a href="https://github.com/PianoNic/ArtPlayerPluginAnime4K/blob/main/LICENSE"><img src="https://img.shields.io/github/license/PianoNic/ArtPlayerPluginAnime4K?color=0d1117" alt="MIT" /></a>
   <img src="https://img.shields.io/badge/WebGPU-0d1117.svg" alt="WebGPU" />
   <img src="https://img.shields.io/badge/TypeScript-0d1117.svg" alt="TypeScript" />
 </p>
