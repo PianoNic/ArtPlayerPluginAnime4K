@@ -13,7 +13,7 @@ import {
   type BenchmarkSample,
   type Mode,
 } from './modes.js';
-import { FrameMonitor } from './monitor.js';
+import { FrameMonitor, watchdogAction } from './monitor.js';
 import { describeMode, resolveOptions, type Anime4kOptions } from './options.js';
 
 export type { Anime4kLabels, Anime4kOptions } from './options.js';
@@ -30,7 +30,7 @@ export interface Anime4kPlugin {
   setMode(mode: Mode): void;
   /** The selected mode, `auto` included. */
   getMode(): Mode;
-  /** What is rendering right now: auto's pick, a downgraded preset, or `off`. */
+  /** What is rendering right now: auto's pick, auto's downgraded preset, or `off`. */
   getActiveMode(): ActiveMode;
   /**
    * Split view: the original video left of `position` (0..1 of the width), the upscaled one right
@@ -58,6 +58,8 @@ export interface Anime4kStats {
   target: Size | null;
   /** Whether an x2 upscale step runs (target more than 1.2x the video on both axes). */
   upscaling: boolean;
+  /** The picked preset keeps falling behind on this GPU; it still renders, the viewer was told. */
+  struggling: boolean;
 }
 
 type VideoFrameCallbackVideo = HTMLVideoElement & {
@@ -82,6 +84,8 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
     let renderer: Renderer | null = null;
     // Set by a downgrade; cleared when the source or the selection changes.
     let ceiling: ActiveMode | null = null;
+    // A picked preset cannot keep up; the notice shows once, until the source or selection changes.
+    let struggling = false;
     // A cross-origin source WebGPU may not read; not retried.
     let blockedSource: string | null = null;
     // Bumped by every rebuild; async work from an older generation stops.
@@ -301,11 +305,23 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
         return;
       }
       built = { native, target };
-      monitor.reset();
+      restartMonitor();
       frameMs = null;
       firstFrame = true;
       setActive(next);
       startLoop();
+    }
+
+    /** Tells the viewer once that their preset is too heavy, and keeps rendering it. */
+    function warnStruggling(): void {
+      if (struggling) return;
+      struggling = true;
+      log('struggling on', active, `bad ratio ${monitor.badRatio().toFixed(2)}`);
+      try {
+        art.notice.show = opts.labels.struggling;
+      } catch {
+        // Notice layer not available on this player.
+      }
     }
 
     function downgrade(): void {
@@ -349,6 +365,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       stopLoop();
       lastTime = -1;
       lastDropped = droppedFrames();
+      framesSinceDropCheck = 0;
       schedule();
       // A paused video presents no new frames: draw the current one now.
       if (video.paused) onFrame();
@@ -381,10 +398,15 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       }
       lastTime = video.currentTime;
 
-      if (++framesSinceDropCheck >= 30) {
+      if (!monitor.settled()) {
+        // Drops from the start, a seek or a stall must not show up in the first count after it.
+        lastDropped = droppedFrames();
+        framesSinceDropCheck = 0;
+      } else if (++framesSinceDropCheck >= 30) {
         framesSinceDropCheck = 0;
         const dropped = droppedFrames();
-        if (dropped > lastDropped && !video.paused) monitor.recordDropped(dropped - lastDropped);
+        if (dropped > lastDropped && !video.paused && !document.hidden)
+          monitor.recordDropped(dropped - lastDropped);
         lastDropped = dropped;
       }
 
@@ -402,7 +424,9 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
           }
           frameMs = frameMs === null ? ms : frameMs * 0.9 + ms * 0.1;
           if (!video.paused) monitor.recordFrame(ms);
-          if (opts.autoDowngrade && monitor.shouldDowngrade()) downgrade();
+          const action = watchdogAction(selected, active, monitor.badWindows(), opts.autoDowngrade);
+          if (action === 'step') downgrade();
+          else if (action === 'warn') warnStruggling();
         })
         .catch((error: unknown) => {
           busy = false;
@@ -432,7 +456,19 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       // New source: hide the old frame and forget its downgrade.
       hideCanvas();
       ceiling = null;
+      struggling = false;
       firstFrame = true;
+    }
+
+    /**
+     * Starts the watchdog over, with a fresh warm-up and grace period. Called after every build and
+     * on the playback events that drop frames on any GPU (start, seek, stall, tab switch), so those
+     * never count against the preset.
+     */
+    function restartMonitor(): void {
+      monitor.reset();
+      lastDropped = droppedFrames();
+      framesSinceDropCheck = 0;
     }
 
     function nativeChanged(): boolean {
@@ -456,7 +492,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
 
     function onVisibility(): void {
       if (document.visibilityState === 'visible') {
-        monitor.reset();
+        restartMonitor();
         if (active !== 'off') startLoop();
       }
     }
@@ -467,6 +503,10 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       ['loadeddata', onSourceReady],
       ['resize', onLayoutChange],
       ['play', onVisibility],
+      ['playing', restartMonitor],
+      ['seeking', restartMonitor],
+      ['seeked', restartMonitor],
+      ['waiting', restartMonitor],
     ];
     for (const [event, handler] of videoEvents) video.addEventListener(event, handler);
     document.addEventListener('visibilitychange', onVisibility);
@@ -526,6 +566,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       const changed = mode !== selected;
       selected = mode;
       ceiling = null;
+      struggling = false;
       if (changed) notify();
       updateSetting();
       void apply();
@@ -605,6 +646,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
             !!target &&
             target.width > native.width * 1.2 &&
             target.height > native.height * 1.2,
+          struggling: struggling && active !== 'off',
         };
       },
       get supported() {

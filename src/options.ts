@@ -13,6 +13,8 @@ export interface Anime4kLabels {
   autoActive: string;
   /** Tooltip when the browser or the video cannot be upscaled. */
   unsupported: string;
+  /** Notice, shown once per source, when a preset the viewer picked cannot keep up. */
+  struggling: string;
 }
 
 export const DEFAULT_LABELS: Anime4kLabels = {
@@ -24,6 +26,7 @@ export const DEFAULT_LABELS: Anime4kLabels = {
   quality: 'Quality',
   autoActive: 'Auto ({mode})',
   unsupported: 'Not supported',
+  struggling: 'Upscaling is heavy for this GPU; try a lighter preset',
 };
 
 export interface Anime4kOptions {
@@ -46,9 +49,12 @@ export interface Anime4kOptions {
   compare?: boolean;
   /** Auto picks the strongest preset whose median GPU time per frame stays under this. Default 8 ms. */
   frameBudgetMs?: number;
-  /** Step down one preset when frames keep taking longer than this. Default 16 ms. */
+  /** Frames taking longer than this on the GPU count against the current preset. Default 16 ms. */
   slowFrameMs?: number;
-  /** Step down one preset when the GPU cannot keep up. Default `true`. */
+  /**
+   * Let auto step down one preset when the GPU cannot keep up. Default `true`. A preset the viewer
+   * picked is never lowered either way; they get a one-time notice (`labels.struggling`) instead.
+   */
   autoDowngrade?: boolean;
   /** Upper bound on the canvas backing store, in pixels. Default 3840 x 2160. */
   maxOutputPixels?: number;

@@ -40,7 +40,7 @@ ratio, quality switches and source changes without the host doing anything.
 
 - **Five modes** - `auto`, `off`, `performance`, `balanced`, `quality`, switchable from the settings gear or the API
 - **Auto mode** - benchmarks each preset on the actual video resolution and screen size, picks the strongest one that fits the frame budget, and remembers the result per GPU
-- **Runtime downgrade** - watches GPU time, skipped and dropped frames; steps down one preset (to `off` at worst) when it cannot keep up
+- **Runtime downgrade** - in auto, watches GPU time, skipped and dropped frames and steps down one preset when the GPU cannot keep up; a preset the viewer picked is never lowered, they get a one-time notice instead
 - **Graceful fallback** - no WebGPU, no adapter, a cross-origin video or a lost GPU all end in `off`, never in an exception
 - **Layered, not replaced** - a `<canvas>` over the `<video>`; playback, audio, seeking, subtitles (including JASSUB) and fullscreen are untouched
 - **Idle when idle** - `requestVideoFrameCallback`-driven, so a paused or hidden video costs nothing
@@ -118,10 +118,26 @@ the cached answer, so a device that benchmarked optimistically does not repeat t
 
 ### When it steps down
 
-A frame is bad when it took longer than `slowFrameMs` (16 ms) on the GPU, was skipped because the
-previous one was still in flight, or was reported dropped by the browser. After 30 warm-up frames,
-once more than a quarter of the last 90 are bad, the plugin steps down one preset and starts
-watching again. The cap is lifted when the user picks a mode or the source changes.
+The plugin judges playback in windows of 90 frames. A frame is bad when it took longer than
+`slowFrameMs` (16 ms) on the GPU. Frames skipped because the previous one was still in flight, and
+frames the browser reports as dropped, only count beyond 6 per window: players drop a few even on
+a fast GPU. A window is bad when more than a quarter of it is bad.
+
+Frames right after a (re)build, playback start, a seek, a stall or a tab switch drop on any GPU, so
+those never count: the watch starts over on each of them, with 30 warm-up frames and 2 seconds in
+which skipped and dropped frames are ignored. Nothing is watched while the tab is hidden.
+
+What happens after **two bad windows in a row** depends on who chose the preset:
+
+- **A preset the viewer picked** (`performance`, `balanced`, `quality`) is never lowered or turned
+  off. It keeps rendering, and ArtPlayer shows `labels.struggling` once per source;
+  `getStats().struggling` turns `true`.
+- **Auto** steps down one preset and starts watching again. Its lowest preset, `performance`, only
+  steps to `off` after **three** bad windows in a row. Apart from that, auto is only ever `off`
+  when its benchmark found no preset that fits `frameBudgetMs`.
+
+With `autoDowngrade: false`, auto keeps its preset too and shows the same notice. The cap is lifted
+when the user picks a mode or the source changes.
 
 ## Options
 
@@ -136,7 +152,7 @@ watching again. The cap is lifted when the user picks a mode or the source chang
 | `compare`         | `boolean`                                  | `false`                      | Start in split view: original on the left, upscaled on the right                 |
 | `frameBudgetMs`   | `number`                                   | `8`                          | Auto's ceiling on median GPU time per frame                                      |
 | `slowFrameMs`     | `number`                                   | `16`                         | Frames slower than this count against the current preset                         |
-| `autoDowngrade`   | `boolean`                                  | `true`                       | Step down when the GPU cannot keep up                                            |
+| `autoDowngrade`   | `boolean`                                  | `true`                       | Let auto step down when the GPU cannot keep up; a picked preset only warns       |
 | `maxOutputPixels` | `number`                                   | `3840 * 2160`                | Cap on the canvas backing store (the upscale target)                             |
 | `cache`           | `boolean`                                  | `true`                       | Remember auto's benchmark per device in `localStorage`                           |
 | `cacheKey`        | `string`                                   | `'artplayer-plugin-anime4k'` | `localStorage` key prefix                                                        |
@@ -150,10 +166,10 @@ watching again. The cap is lifted when the user picks a mode or the source chang
 | --------------------------- | -------------------------------------------------------------------------------- |
 | `setMode(mode)`             | Select a mode; unknown values are ignored                                        |
 | `getMode()`                 | The selected mode, `'auto'` included                                             |
-| `getActiveMode()`           | What is rendering now: auto's pick, a downgraded preset, or `'off'`              |
+| `getActiveMode()`           | What is rendering now: auto's pick, auto's downgraded preset, or `'off'`         |
 | `setCompare(on, position?)` | Split view on/off; `position` (0..1, default 0.5) is where the line sits         |
 | `getCompare()`              | Whether the split view is on                                                     |
-| `getStats()`                | `{ active, frameMs, native, target, upscaling }` for a status readout            |
+| `getStats()`                | `{ active, frameMs, native, target, upscaling, struggling }` for a readout       |
 | `supported`                 | WebGPU is usable (`false` until the check finishes)                              |
 | `ready`                     | `Promise<boolean>` resolving with `supported`; never rejects                     |
 | `destroy()`                 | Remove the canvas and settings entry, free the GPU; also runs on `art.destroy()` |
@@ -174,6 +190,7 @@ artplayerPluginAnime4k({
     quality: 'Qualität',
     autoActive: 'Automatisch ({mode})', // {mode} becomes the label of the preset auto chose
     unsupported: 'Nicht unterstützt',
+    struggling: 'Hochskalierung ist für diese GPU zu aufwendig; wähle eine leichtere Stufe',
   },
 });
 ```

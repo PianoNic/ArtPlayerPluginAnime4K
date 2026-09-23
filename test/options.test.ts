@@ -68,6 +68,14 @@ describe('resolveOptions', () => {
     expect(o.labels.auto).toBe('Auto');
   });
 
+  it('has a translatable notice for a preset that cannot keep up', () => {
+    expect(resolveOptions().labels.struggling).toBe(
+      'Upscaling is heavy for this GPU; try a lighter preset',
+    );
+    const o = resolveOptions({ labels: { struggling: 'Zu schwer für diese GPU' } });
+    expect(o.labels.struggling).toBe('Zu schwer für diese GPU');
+  });
+
   it('turns the split view on only for an explicit true', () => {
     expect(resolveOptions({ compare: true }).compare).toBe(true);
     expect(resolveOptions({ compare: 'yes' as never }).compare).toBe(false);

@@ -78,7 +78,8 @@ const size = (s: { width: number; height: number } | null) => (s ? `${s.width}×
 setInterval(() => {
   if (!plugin) return;
   const stats = plugin.getStats();
-  $('s-active').textContent = stats.active + (mode === 'auto' ? ' (auto)' : '');
+  $('s-active').textContent =
+    stats.active + (mode === 'auto' ? ' (auto)' : '') + (stats.struggling ? ', struggling' : '');
   $('s-ms').textContent = stats.frameMs === null ? '-' : `${stats.frameMs.toFixed(2)} ms`;
   $('s-native').textContent = size(stats.native);
   $('s-target').textContent = size(stats.target);
