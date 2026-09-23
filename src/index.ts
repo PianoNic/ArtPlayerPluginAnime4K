@@ -342,6 +342,8 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
     let lastTime = -1;
     let lastDropped = 0;
     let framesSinceDropCheck = 0;
+    // The video size the frame loop last asked a rebuild for.
+    let rebuildRequested: string | null = null;
 
     function schedule(): void {
       if (destroyed || loopHandle !== null) return;
@@ -366,9 +368,10 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       lastTime = -1;
       lastDropped = droppedFrames();
       framesSinceDropCheck = 0;
-      schedule();
-      // A paused video presents no new frames: draw the current one now.
+      // A paused video presents no new frames: draw the current one now. `onFrame` schedules the
+      // next one itself; scheduling here as well would start a second loop.
       if (video.paused) onFrame();
+      else schedule();
     }
 
     function droppedFrames(): number {
@@ -386,9 +389,16 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
 
       if (document.visibilityState === 'hidden') return;
       if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
-      // A quality switch changes the frame size before `resize` fires.
+      // A quality switch changes the frame size before `resize` fires. The old chain cannot draw
+      // the new frames, so the plain video shows until the rebuild is in, not a frozen picture.
+      // Asked once per size: re-arming the debounce on every frame kept it from ever firing.
       if (nativeChanged()) {
-        onLayoutChange();
+        const size = `${video.videoWidth}x${video.videoHeight}`;
+        if (rebuildRequested !== size) {
+          rebuildRequested = size;
+          hideCanvas();
+          onLayoutChange();
+        }
         return;
       }
       if (video.paused && video.currentTime === lastTime && !firstFrame) return;
