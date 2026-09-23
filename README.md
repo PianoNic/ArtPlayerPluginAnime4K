@@ -41,6 +41,7 @@ ratio, quality switches and source changes without the host doing anything.
 - **Five modes** - `auto`, `off`, `performance`, `balanced`, `quality`, switchable from the settings gear or the API
 - **Auto mode** - benchmarks each preset on the actual video resolution and screen size, picks the strongest one that fits the frame budget, and remembers the result per GPU
 - **Runtime downgrade** - in auto, watches GPU time, skipped and dropped frames and steps down one preset when the GPU cannot keep up; a preset the viewer picked is never lowered, they get a one-time notice instead
+- **Audio stays in sync** - the upscaled picture reaches the screen a little after the plain video would have; the audio is delayed by exactly that much
 - **Graceful fallback** - no WebGPU, no adapter, a cross-origin video or a lost GPU all end in `off`, never in an exception
 - **Layered, not replaced** - a `<canvas>` over the `<video>`; playback, audio, seeking, subtitles (including JASSUB) and fullscreen are untouched
 - **Idle when idle** - `requestVideoFrameCallback`-driven, so a paused or hidden video costs nothing
@@ -139,6 +140,30 @@ What happens after **two bad windows in a row** depends on who chose the preset:
 With `autoDowngrade: false`, auto keeps its preset too and shows the same notice. The cap is lifted
 when the user picks a mode or the source changes.
 
+### Audio sync
+
+The upscaled frame reaches the screen after the plain one would have, by the GPU time for that frame:
+about 8 ms for `performance` up to 40 ms or more for `quality` on an integrated GPU. From about
+45 ms on, viewers notice the sound running ahead of the picture.
+
+With `syncAudio` (the default), the plugin measures that lag on every frame, takes the median of
+the last 30 frames, and delays the video's audio by as much through Web Audio
+(`video` -> `DelayNode` -> speakers). The delay changes slowly, at most 2% of real time, so a preset
+switch never clicks or audibly bends the pitch. It is capped at 250 ms: a preset the viewer picked
+whose picture trails by more than that gets the `labels.struggling` notice instead. With upscaling
+off, the delay ramps back to 0.
+
+What to know:
+
+- The audio is only rerouted once a frame has been upscaled, which proves the video is readable
+  (same-origin or CORS); Web Audio would play an unreadable one as silence. It also waits for the
+  page's first user gesture, since an audio context cannot start before one.
+- A media element can be routed through Web Audio only once, and for good. The plugin does it at
+  most once per `<video>`, and a player created later on the same element reuses it. If your page
+  already calls `createMediaElementSource` on the video itself, the plugin leaves the audio alone.
+- The element's `volume` and `muted` apply as before.
+- Skipped on iOS, where routing element audio through Web Audio is unreliable.
+
 ## Options
 
 | Option            | Type                                       | Default                      | Description                                                                      |
@@ -153,6 +178,7 @@ when the user picks a mode or the source changes.
 | `frameBudgetMs`   | `number`                                   | `8`                          | Auto's ceiling on median GPU time per frame                                      |
 | `slowFrameMs`     | `number`                                   | `16`                         | Frames slower than this count against the current preset                         |
 | `autoDowngrade`   | `boolean`                                  | `true`                       | Let auto step down when the GPU cannot keep up; a picked preset only warns       |
+| `syncAudio`       | `boolean`                                  | `true`                       | Delay the audio by as much as the upscaled picture trails (see Audio sync)       |
 | `maxOutputPixels` | `number`                                   | `3840 * 2160`                | Cap on the canvas backing store (the upscale target)                             |
 | `cache`           | `boolean`                                  | `true`                       | Remember auto's benchmark per device in `localStorage`                           |
 | `cacheKey`        | `string`                                   | `'artplayer-plugin-anime4k'` | `localStorage` key prefix                                                        |
@@ -162,17 +188,17 @@ when the user picks a mode or the source changes.
 
 `art.plugins.artplayerPluginAnime4k`:
 
-| Member                      | Description                                                                      |
-| --------------------------- | -------------------------------------------------------------------------------- |
-| `setMode(mode)`             | Select a mode; unknown values are ignored                                        |
-| `getMode()`                 | The selected mode, `'auto'` included                                             |
-| `getActiveMode()`           | What is rendering now: auto's pick, auto's downgraded preset, or `'off'`         |
-| `setCompare(on, position?)` | Split view on/off; `position` (0..1, default 0.5) is where the line sits         |
-| `getCompare()`              | Whether the split view is on                                                     |
-| `getStats()`                | `{ active, frameMs, native, target, upscaling, struggling }` for a readout       |
-| `supported`                 | WebGPU is usable (`false` until the check finishes)                              |
-| `ready`                     | `Promise<boolean>` resolving with `supported`; never rejects                     |
-| `destroy()`                 | Remove the canvas and settings entry, free the GPU; also runs on `art.destroy()` |
+| Member                      | Description                                                                             |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| `setMode(mode)`             | Select a mode; unknown values are ignored                                               |
+| `getMode()`                 | The selected mode, `'auto'` included                                                    |
+| `getActiveMode()`           | What is rendering now: auto's pick, auto's downgraded preset, or `'off'`                |
+| `setCompare(on, position?)` | Split view on/off; `position` (0..1, default 0.5) is where the line sits                |
+| `getCompare()`              | Whether the split view is on                                                            |
+| `getStats()`                | `{ active, frameMs, native, target, upscaling, struggling, canvasLagMs, audioDelayMs }` |
+| `supported`                 | WebGPU is usable (`false` until the check finishes)                                     |
+| `ready`                     | `Promise<boolean>` resolving with `supported`; never rejects                            |
+| `destroy()`                 | Remove the canvas and settings entry, free the GPU; also runs on `art.destroy()`        |
 
 The plugin only reads `mode` at start-up. To remember a viewer's choice, store what `onModeChange`
 reports and pass it back as `mode` next time.

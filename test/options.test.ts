@@ -12,6 +12,7 @@ describe('resolveOptions', () => {
     expect(o.frameBudgetMs).toBe(8);
     expect(o.slowFrameMs).toBe(16);
     expect(o.autoDowngrade).toBe(true);
+    expect(o.syncAudio).toBe(true);
     expect(o.maxOutputPixels).toBe(3840 * 2160);
     expect(o.cache).toBe(true);
     expect(o.cacheKey).toBe('artplayer-plugin-anime4k');
@@ -48,6 +49,7 @@ describe('resolveOptions', () => {
       setting: false,
       cache: false,
       autoDowngrade: false,
+      syncAudio: false,
     });
     expect(o.mode).toBe('quality');
     expect(o.frameBudgetMs).toBe(100);
@@ -56,6 +58,7 @@ describe('resolveOptions', () => {
     expect(o.setting).toBe(false);
     expect(o.cache).toBe(false);
     expect(o.autoDowngrade).toBe(false);
+    expect(o.syncAudio).toBe(false);
   });
 
   it('merges partial labels over the defaults and ignores empty ones', () => {

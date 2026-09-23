@@ -1,6 +1,6 @@
 {
   "name": "artplayer-plugin-anime4k",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Real-time Anime4K upscaling for ArtPlayer, on WebGPU. Auto-benchmarks the device, steps down when the GPU cannot keep up.",
   "keywords": [
     "artplayer",

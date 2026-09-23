@@ -1,4 +1,5 @@
 import type Artplayer from 'artplayer';
+import { AudioDelay, audioDelayFor, isIos, LagEstimator, MAX_AUDIO_DELAY_MS } from './audio.js';
 import { benchmarkCacheKey, readCachedMode, safeLocalStorage, writeCachedMode } from './cache.js';
 import { acquireGpu, measurePreset, Renderer, type GpuContext } from './gpu.js';
 import { computeLayout, targetChanged, type Rect, type Size } from './layout.js';
@@ -60,10 +61,14 @@ export interface Anime4kStats {
   upscaling: boolean;
   /** The picked preset keeps falling behind on this GPU; it still renders, the viewer was told. */
   struggling: boolean;
+  /** How much later than the plain video the upscaled frame shows, smoothed; null when unknown. */
+  canvasLagMs: number | null;
+  /** How far the audio is delayed to match it (`syncAudio`), mid-ramp included. */
+  audioDelayMs: number;
 }
 
 type VideoFrameCallbackVideo = HTMLVideoElement & {
-  requestVideoFrameCallback?: (callback: () => void) => number;
+  requestVideoFrameCallback?: (callback: (now: number) => void) => number;
   cancelVideoFrameCallback?: (handle: number) => void;
 };
 
@@ -139,6 +144,32 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
 
     const monitor = new FrameMonitor({ slowFrameMs: opts.slowFrameMs });
 
+    // ---- audio sync ---------------------------------------------------------------------------
+    //
+    // The upscaled frame reaches the screen after the plain one would have: the video frame first,
+    // then the GPU work. The audio is delayed by that much through Web Audio so the two stay in step.
+    // It only starts once a frame was upscaled, which proves the video is readable (same-origin or
+    // CORS): Web Audio would play a tainted element as silence.
+
+    const lag = new LagEstimator();
+    const audio =
+      opts.syncAudio && typeof AudioContext === 'function' && !isIos(navigator)
+        ? new AudioDelay(video)
+        : null;
+
+    function syncAudio(): void {
+      if (!audio) return;
+      if (active === 'off') return audio.set(0);
+      const lagMs = lag.value();
+      // Right after a rebuild the estimator is empty: the delay stays until it has refilled.
+      if (lagMs === null) return;
+      // Delaying the sound by a quarter second or more is no fix: that preset is too heavy.
+      if (lagMs > MAX_AUDIO_DELAY_MS && selected !== 'auto') warnStruggling();
+      audio.set(audioDelayFor(lagMs));
+    }
+
+    const wakeAudio = () => audio?.wake();
+
     // ---- layout -------------------------------------------------------------------------------
 
     function measure(): { rect: Rect; target: Size } | null {
@@ -175,7 +206,11 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
     function setActive(next: ActiveMode): void {
       const changed = next !== active;
       active = next;
-      if (next === 'off') hideCanvas();
+      if (next === 'off') {
+        hideCanvas();
+        lag.reset();
+        syncAudio();
+      }
       if (changed) {
         log('active mode', next);
         notify();
@@ -306,6 +341,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       }
       built = { native, target };
       restartMonitor();
+      lag.reset();
       frameMs = null;
       firstFrame = true;
       setActive(next);
@@ -370,7 +406,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       framesSinceDropCheck = 0;
       // A paused video presents no new frames: draw the current one now. `onFrame` schedules the
       // next one itself; scheduling here as well would start a second loop.
-      if (video.paused) onFrame();
+      if (video.paused) onFrame(performance.now());
       else schedule();
     }
 
@@ -382,7 +418,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       }
     }
 
-    function onFrame(): void {
+    function onFrame(frameStart = performance.now()): void {
       loopHandle = null;
       if (destroyed || active === 'off' || !renderer?.ready) return;
       schedule();
@@ -433,7 +469,13 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
             applyCompare();
           }
           frameMs = frameMs === null ? ms : frameMs * 0.9 + ms * 0.1;
-          if (!video.paused) monitor.recordFrame(ms);
+          if (!video.paused) {
+            monitor.recordFrame(ms);
+            // `frameStart` is when the compositor began the frame that brought this video frame; the
+            // upscaled one can only start down the same path once the GPU is done with it.
+            lag.push(performance.now() - frameStart);
+            syncAudio();
+          }
           const action = watchdogAction(selected, active, monitor.badWindows(), opts.autoDowngrade);
           if (action === 'step') downgrade();
           else if (action === 'warn') warnStruggling();
@@ -513,6 +555,7 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       ['loadeddata', onSourceReady],
       ['resize', onLayoutChange],
       ['play', onVisibility],
+      ['play', wakeAudio],
       ['playing', restartMonitor],
       ['seeking', restartMonitor],
       ['seeked', restartMonitor],
@@ -520,6 +563,10 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
     ];
     for (const [event, handler] of videoEvents) video.addEventListener(event, handler);
     document.addEventListener('visibilitychange', onVisibility);
+    // An audio context only starts after a user gesture.
+    for (const event of ['pointerdown', 'keydown']) {
+      document.addEventListener(event, wakeAudio, { capture: true, passive: true });
+    }
 
     const resizeObserver =
       typeof ResizeObserver === 'function' ? new ResizeObserver(onLayoutChange) : null;
@@ -590,6 +637,11 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
       if (resizeTimer) clearTimeout(resizeTimer);
       for (const [event, handler] of videoEvents) video.removeEventListener(event, handler);
       document.removeEventListener('visibilitychange', onVisibility);
+      for (const event of ['pointerdown', 'keydown']) {
+        document.removeEventListener(event, wakeAudio, { capture: true });
+      }
+      // The element stays routed through Web Audio for good; only the delay goes.
+      audio?.reset();
       resizeObserver?.disconnect();
       if (settingAdded) {
         try {
@@ -657,6 +709,8 @@ export default function artplayerPluginAnime4k(option: Anime4kOptions = {}) {
             target.width > native.width * 1.2 &&
             target.height > native.height * 1.2,
           struggling: struggling && active !== 'off',
+          canvasLagMs: active === 'off' ? null : lag.value(),
+          audioDelayMs: audio?.currentMs ?? 0,
         };
       },
       get supported() {

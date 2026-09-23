@@ -49,6 +49,8 @@ function load(url: string, mode: Mode): void {
       artplayerPluginAnime4k({
         mode,
         debug: true,
+        // `?sync=0` leaves the audio undelayed, to compare.
+        syncAudio: params.get('sync') !== '0',
         onModeChange(selected, active) {
           show('selected', selected);
           show('active', active);

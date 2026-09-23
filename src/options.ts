@@ -56,6 +56,11 @@ export interface Anime4kOptions {
    * picked is never lowered either way; they get a one-time notice (`labels.struggling`) instead.
    */
   autoDowngrade?: boolean;
+  /**
+   * Delay the video's audio by as much as the upscaled picture trails the plain video, so sound and
+   * picture stay in step. Routes the element's audio through Web Audio. Default `true`.
+   */
+  syncAudio?: boolean;
   /** Upper bound on the canvas backing store, in pixels. Default 3840 x 2160. */
   maxOutputPixels?: number;
   /** Remember the auto benchmark per device in localStorage. Default `true`. */
@@ -77,6 +82,7 @@ export interface ResolvedOptions {
   frameBudgetMs: number;
   slowFrameMs: number;
   autoDowngrade: boolean;
+  syncAudio: boolean;
   maxOutputPixels: number;
   cache: boolean;
   cacheKey: string;
@@ -119,6 +125,7 @@ export function resolveOptions(input: Anime4kOptions | null | undefined = {}): R
     frameBudgetMs: positive(o.frameBudgetMs, 8, 1, 100),
     slowFrameMs: positive(o.slowFrameMs, 16, 1, 200),
     autoDowngrade: o.autoDowngrade !== false,
+    syncAudio: o.syncAudio !== false,
     maxOutputPixels: Math.round(positive(o.maxOutputPixels, 3840 * 2160, 320 * 180, 7680 * 4320)),
     cache: o.cache !== false,
     cacheKey: nonEmptyString(o.cacheKey, 'artplayer-plugin-anime4k'),
